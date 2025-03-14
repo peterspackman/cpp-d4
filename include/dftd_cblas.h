@@ -18,9 +18,12 @@
 #pragma once
 
 #include "dftd_matrix.h"
-
+#ifdef DFTD4_USE_EIGEN
+#include <Eigen/Dense>
+#else
 #include "cblas.h"
 #include "lapacke.h"
+#endif
 
 namespace dftd4 {
 
@@ -41,6 +44,24 @@ inline int BLAS_Add_Mat_x_Vec(
   bool Transpose,
   double alpha
 ) {
+#ifdef DFTD4_USE_EIGEN
+  if (A.rows == C.N && A.cols == V.N) {
+    // Map TMatrix and TVector to Eigen matrices
+    Eigen::Map<Eigen::MatrixXd> eigenA(A.p, A.rows, A.cols);
+    Eigen::Map<Eigen::VectorXd> eigenV(V.p, V.N);
+    Eigen::Map<Eigen::VectorXd> eigenC(C.p, C.N);
+
+    if (Transpose) {
+      // C += alpha * A^T * V
+      eigenC += alpha * eigenA.transpose() * eigenV;
+    } else {
+      // C += alpha * A * V
+      eigenC += alpha * eigenA * eigenV;
+    }
+    return EXIT_SUCCESS;
+  }
+  return EXIT_FAILURE;
+#else
   if (A.rows == C.N && A.cols == V.N) {
     if (Transpose) {
       cblas_dgemv(
@@ -78,6 +99,7 @@ inline int BLAS_Add_Mat_x_Vec(
   };
 
   return EXIT_FAILURE;
+#endif
 };
 
 /**
@@ -99,6 +121,49 @@ inline int BLAS_Add_Mat_x_Mat(
   const bool TransposeB,
   const double alpha
 ) {
+#ifdef DFTD4_USE_EIGEN
+  // check for size 0 matrices
+  if (A.cols == 0 || A.rows == 0 || B.cols == 0 || B.rows == 0 || C.cols == 0 ||
+      C.rows == 0)
+    return EXIT_FAILURE;
+
+  // Map TMatrix to Eigen matrices
+  Eigen::Map<const Eigen::MatrixXd> eigenA(A.p, A.rows, A.cols);
+  Eigen::Map<const Eigen::MatrixXd> eigenB(B.p, B.rows, B.cols);
+  Eigen::Map<Eigen::MatrixXd> eigenC(C.p, C.rows, C.cols);
+
+  // Handle different transpose combinations
+  if (!TransposeA) {
+    if (!TransposeB) {
+      // C += alpha * A * B
+      if (A.cols != B.rows || A.rows != C.rows || B.cols != C.cols) {
+        return EXIT_FAILURE;
+      }
+      eigenC += alpha * eigenA * eigenB;
+    } else {
+      // C += alpha * A * B^T
+      if (A.cols != B.cols || A.rows != C.rows || B.rows != C.cols) {
+        return EXIT_FAILURE;
+      }
+      eigenC += alpha * eigenA * eigenB.transpose();
+    }
+  } else {
+    if (!TransposeB) {
+      // C += alpha * A^T * B
+      if (A.rows != B.rows || A.cols != C.rows || B.cols != C.cols) {
+        return EXIT_FAILURE;
+      }
+      eigenC += alpha * eigenA.transpose() * eigenB;
+    } else {
+      // C += alpha * A^T * B^T
+      if (A.rows != B.cols || A.cols != C.rows || B.rows != C.cols) {
+        return EXIT_FAILURE;
+      }
+      eigenC += alpha * eigenA.transpose() * eigenB.transpose();
+    }
+  }
+  return EXIT_SUCCESS;
+#else
   // check for size 0 matrices
   if (A.cols == 0 || A.rows == 0 || B.cols == 0 || B.rows == 0 || C.cols == 0 ||
       C.rows == 0)
@@ -201,6 +266,7 @@ inline int BLAS_Add_Mat_x_Mat(
     }; // B transposed
   };
   return EXIT_SUCCESS;
+#endif
 };
 
 /**
@@ -210,6 +276,22 @@ inline int BLAS_Add_Mat_x_Mat(
  * @return Exit code.
  */
 inline int BLAS_InvertMatrix(TMatrix<double> &a) {
+#ifdef DFTD4_USE_EIGEN
+  if (a.rows != a.cols) { return EXIT_FAILURE; }
+
+  try {
+    // Map TMatrix to Eigen matrix
+    Eigen::Map<Eigen::MatrixXd> eigenA(a.p, a.rows, a.cols);
+    
+    // Compute inverse using Eigen
+    eigenA = eigenA.inverse();
+    
+    return EXIT_SUCCESS;
+  } catch (...) {
+    // Handle potential exceptions from Eigen
+    return EXIT_FAILURE;
+  }
+#else
   if (a.rows != a.cols) { return EXIT_FAILURE; }
 
   lapack_int info;
@@ -235,6 +317,7 @@ inline int BLAS_InvertMatrix(TMatrix<double> &a) {
   delete[] ipiv;
 
   return EXIT_SUCCESS;
+#endif
 };
 
 } // namespace dftd4
