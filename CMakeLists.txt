@@ -9,6 +9,7 @@ project(dftd4
 # Options
 option(BUILD_SHARED_LIBS "Build shared libraries" ON)
 option(DFTD4_USE_EIGEN "Use Eigen instead of BLAS/LAPACK" OFF)
+option(DFTD4_USE_EIGEN "Use Eigen instead of BLAS/LAPACK" OFF)
 option(SANITIZER "Sanitizer type" "none")
 
 # Set C++ standard using target properties instead of global variables
@@ -43,12 +44,13 @@ set(HEADERS
   include/damping/dftd_rational.h
 )
 
-# Find required dependencies
 if(DFTD4_USE_EIGEN)
-  # Find Eigen
-  find_package(Eigen3 REQUIRED NO_MODULE)
-  if(NOT EIGEN3_FOUND)
-    message(FATAL_ERROR "Eigen3 library not found")
+  if(NOT TARGET Eigen3::Eigen)
+    find_package(Eigen3 3.3 REQUIRED)
+    find_package(Eigen3 REQUIRED NO_MODULE)
+    if(NOT EIGEN3_FOUND)
+      message(FATAL_ERROR "Eigen3 library not found")
+    endif()
   endif()
   message(STATUS "Using Eigen ${EIGEN3_VERSION}")
 else()
