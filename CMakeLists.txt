@@ -46,7 +46,7 @@ set(HEADERS
 # Find required dependencies
 if(DFTD4_USE_EIGEN)
   # Find Eigen
-  find_package(Eigen3 3.3 REQUIRED NO_MODULE)
+  find_package(Eigen3 REQUIRED NO_MODULE)
   if(NOT EIGEN3_FOUND)
     message(FATAL_ERROR "Eigen3 library not found")
   endif()
